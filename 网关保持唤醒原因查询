@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>网关保持唤醒原因查询</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f0f2f5;
+    color: #1d2129;
+    padding: 24px 16px;
+    min-height: 100vh;
+  }
+  .container {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 22px;
+    text-align: center;
+    margin-bottom: 20px;
+    color: #165dff;
+  }
+  .card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .input-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  input[type="text"] {
+    flex: 1;
+    padding: 10px 14px;
+    font-size: 15px;
+    border: 1px solid #c9cdd4;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input[type="text"]:focus { border-color: #165dff; }
+  button {
+    padding: 10px 22px;
+    font-size: 15px;
+    background: #165dff;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  button:hover { background: #0e42d2; }
+  .examples {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .examples span {
+    font-size: 13px;
+    color: #86909c;
+    align-self: center;
+    margin-right: 4px;
+  }
+  .examples button {
+    padding: 5px 12px;
+    font-size: 13px;
+    background: #f2f3f5;
+    color: #4e5969;
+    border-radius: 4px;
+  }
+  .examples button:hover { background: #e5e6eb; color: #1d2129; }
+  .error {
+    color: #f53f3f;
+    font-size: 14px;
+    margin-top: 8px;
+    display: none;
+  }
+  .result-section { margin-top: 16px; }
+  .result-section h3 {
+    font-size: 15px;
+    color: #4e5969;
+    margin-bottom: 8px;
+    border-left: 3px solid #165dff;
+    padding-left: 8px;
+  }
+  .kv-row {
+    display: flex;
+    padding: 6px 0;
+    font-size: 14px;
+    border-bottom: 1px dashed #e5e6eb;
+  }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-label {
+    width: 110px;
+    color: #86909c;
+    flex-shrink: 0;
+  }
+  .kv-value {
+    color: #1d2129;
+    word-break: break-all;
+    font-family: "Consolas", "Monaco", monospace;
+  }
+  .bin-group {
+    display: inline-block;
+    padding: 2px 6px;
+    margin-right: 4px;
+    background: #f2f3f5;
+    border-radius: 3px;
+    font-family: "Consolas", monospace;
+    font-size: 13px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin-top: 6px;
+  }
+  th, td {
+    border: 1px solid #e5e6eb;
+    padding: 8px 10px;
+    text-align: center;
+  }
+  th { background: #f7f8fa; color: #4e5969; font-weight: 600; }
+  .bit-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .bit-tag {
+    padding: 4px 10px;
+    background: #e8f3ff;
+    color: #165dff;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: "Consolas", monospace;
+  }
+  .bit-tag.reserved {
+    background: #fff7e8;
+    color: #ff7d00;
+  }
+  .reason-list { margin-top: 6px; }
+  .reason-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: #f2f3f5;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 14px;
+  }
+  .reason-item .bit-num {
+    font-family: "Consolas", monospace;
+    font-weight: 600;
+    color: #165dff;
+    min-width: 55px;
+  }
+  .reason-item .reason-name {
+    color: #1d2129;
+    font-weight: 500;
+  }
+  .reason-item.reserved { background: #fff7e8; }
+  .reason-item.reserved .bit-num { color: #ff7d00; }
+  .empty-tip {
+    color: #86909c;
+    font-size: 14px;
+    padding: 10px 0;
+  }
+  .ref-table { margin-top: 0; }
+  .ref-table th, .ref-table td { font-size: 13px; padding: 6px 8px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>网关保持唤醒原因查询</h1>
+
+  <div class="card">
+    <div class="input-row">
+      <input type="text" id="decInput" placeholder="请输入十进制数值，如 65536" />
+      <button onclick="doQuery()">查询</button>
+    </div>
+    <div class="examples">
+      <span>快捷示例：</span>
+      <button onclick="fillExample(65536)">65536 (Body_CAN)</button>
+      <button onclick="fillExample(262144)">262144 (TBOX_CANFD)</button>
+      <button onclick="fillExample(327680)">327680 (多原因)</button>
+    </div>
+    <div class="error" id="errorMsg"></div>
+  </div>
+
+  <div class="card hidden" id="resultCard">
+    <div class="result-section">
+      <h3>数值表示</h3>
+      <div class="kv-row"><span class="kv-label">十进制</span><span class="kv-value" id="rDec"></span></div>
+      <div class="kv-row"><span class="kv-label">十六进制</span><span class="kv-value" id="rHex"></span></div>
+      <div class="kv-row"><span class="kv-label">32位二进制</span><span class="kv-value" id="rBin"></span></div>
+    </div>
+
+    <div class="result-section">
+      <h3>字节拆分（Motorola 大端）</h3>
+      <table>
+        <thead><tr><th>第5字节</th><th>第6字节</th><th>第7字节</th><th>第8字节</th></tr></thead>
+        <tbody><tr id="byteRow"></tr></tbody>
+      </table>
+    </div>
+
+    <div class="result-section">
+      <h3>置位 Bit 列表</h3>
+      <div class="bit-list" id="bitList"></div>
+    </div>
+
+    <div class="result-section">
+      <h3>唤醒原因</h3>
+      <div class="reason-list" id="reasonList"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="font-size:15px;color:#4e5969;margin-bottom:10px;border-left:3px solid #165dff;padding-left:8px;">唤醒原因 Bit 定义对照表</h3>
+    <table class="ref-table">
+      <thead><tr><th>物理 Bit</th><th>唤醒原因</th><th>所在字节</th></tr></thead>
+      <tbody>
+        <tr><td>Bit37</td><td>KL15</td><td>第5字节</td></tr>
+        <tr><td>Bit38</td><td>PMS_CANFD</td><td>第5字节</td></tr>
+        <tr><td>Bit39</td><td>Chassis_CAN</td><td>第5字节</td></tr>
+        <tr><td>Bit40</td><td>Body_CAN</td><td>第6字节</td></tr>
+        <tr><td>Bit41</td><td>Information_CAN</td><td>第6字节</td></tr>
+        <tr><td>Bit42</td><td>TBOX_CANFD</td><td>第6字节</td></tr>
+        <tr><td>Bit43</td><td>ADAS_CAN</td><td>第6字节</td></tr>
+        <tr><td>Bit44</td><td>Diagnosis service is in progress</td><td>第6字节</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// 唤醒原因映射表：物理Bit -> 原因名称
+const REASON_MAP = {
+  37: 'KL15',
+  38: 'PMS_CANFD',
+  39: 'Chassis_CAN',
+  40: 'Body_CAN',
+  41: 'Information_CAN',
+  42: 'TBOX_CANFD',
+  43: 'ADAS_CAN',
+  44: 'Diagnosis service is in progress'
+};
+
+// 回车触发查询
+document.getElementById('decInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doQuery();
+});
+
+function fillExample(val) {
+  document.getElementById('decInput').value = val;
+  doQuery();
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.style.display = 'block';
+  document.getElementById('resultCard').classList.add('hidden');
+}
+
+function hideError() {
+  document.getElementById('errorMsg').style.display = 'none';
+}
+
+/**
+ * 32位值的第n位（n=0为LSB）换算为物理Bit编号
+ * 大端排列：第5字节=bits31~24, 第6字节=bits23~16, 第7字节=bits15~8, 第8字节=bits7~0
+ * 物理Bit：第5字节Bit32~39, 第6字节Bit40~47, 第7字节Bit48~55, 第8字节Bit56~63
+ */
+function bitNtoPhysicalBit(n) {
+  const byteIdx = 3 - Math.floor(n / 8); // 0=第5字节,1=第6字节,2=第7字节,3=第8字节
+  const bitInByte = n % 8;
+  return 32 + byteIdx * 8 + bitInByte;
+}
+
+function doQuery() {
+  const raw = document.getElementById('decInput').value.trim();
+  hideError();
+
+  if (raw === '') {
+    showError('请输入十进制数值');
+    return;
+  }
+  if (!/^\d+$/.test(raw)) {
+    showError('请输入有效的非负整数（十进制）');
+    return;
+  }
+
+  const value = parseInt(raw, 10);
+  if (isNaN(value) || value < 0 || value > 0xFFFFFFFF) {
+    showError('数值超出 32 位无符号整数范围（0 ~ 4294967295）');
+    return;
+  }
+
+  // 数值表示
+  document.getElementById('rDec').textContent = value.toString();
+  document.getElementById('rHex').textContent = '0x' + value.toString(16).toUpperCase().padStart(8, '0');
+
+  // 32位二进制，按4字节分组
+  const bin32 = value.toString(2).padStart(32, '0');
+  const binHtml =
+    '<span class="bin-group">' + bin32.substring(0,8) + '</span>' +
+    '<span class="bin-group">' + bin32.substring(8,16) + '</span>' +
+    '<span class="bin-group">' + bin32.substring(16,24) + '</span>' +
+    '<span class="bin-group">' + bin32.substring(24,32) + '</span>';
+  document.getElementById('rBin').innerHTML = binHtml;
+
+  // 字节拆分（大端）
+  const b5 = (value >>> 24) & 0xFF;
+  const b6 = (value >>> 16) & 0xFF;
+  const b7 = (value >>> 8) & 0xFF;
+  const b8 = value & 0xFF;
+  document.getElementById('byteRow').innerHTML =
+    '<td>0x' + b5.toString(16).toUpperCase().padStart(2,'0') + '</td>' +
+    '<td>0x' + b6.toString(16).toUpperCase().padStart(2,'0') + '</td>' +
+    '<td>0x' + b7.toString(16).toUpperCase().padStart(2,'0') + '</td>' +
+    '<td>0x' + b8.toString(16).toUpperCase().padStart(2,'0') + '</td>';
+
+  // 遍历所有置位的bit
+  const setBits = [];
+  for (let n = 0; n <= 31; n++) {
+    if (value & (1 << n)) {
+      const physBit = bitNtoPhysicalBit(n);
+      setBits.push({ n: n, physBit: physBit });
+    }
+  }
+
+  // 置位Bit列表
+  const bitListEl = document.getElementById('bitList');
+  if (setBits.length === 0) {
+    bitListEl.innerHTML = '<span class="empty-tip">无置位 Bit</span>';
+  } else {
+    bitListEl.innerHTML = setBits.map(function(b) {
+      const isReserved = !(b.physBit in REASON_MAP);
+      return '<span class="bit-tag' + (isReserved ? ' reserved' : '') + '">Bit' + b.physBit + '</span>';
+    }).join('');
+  }
+
+  // 唤醒原因清单
+  const reasonListEl = document.getElementById('reasonList');
+  if (setBits.length === 0) {
+    reasonListEl.innerHTML = '<div class="empty-tip">无唤醒原因置位</div>';
+  } else {
+    reasonListEl.innerHTML = setBits.map(function(b) {
+      const reason = REASON_MAP[b.physBit];
+      if (reason) {
+        return '<div class="reason-item"><span class="bit-num">Bit' + b.physBit + '</span><span class="reason-name">' + reason + '</span></div>';
+      } else {
+        return '<div class="reason-item reserved"><span class="bit-num">Bit' + b.physBit + '</span><span class="reason-name">保留位 / 未定义</span></div>';
+      }
+    }).join('');
+  }
+
+  document.getElementById('resultCard').classList.remove('hidden');
+}
+</script>
+</body>
+</html>
